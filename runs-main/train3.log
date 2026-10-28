@@ -1,0 +1,18 @@
+[config] {"vocab_size": 10000, "d_model": 768, "n_layers": 12, "n_heads": 12, "ctx": 512, "d_ff": 2048, "attn": "sdpa", "tie_embeddings": false, "residual_init_scale": false, "preset": "main", "n_params": 100313856}
+[data] train tokens: 467,404,398 | valid tokens: 4,702,679
+[resume] from step 54000
+[train] step 54100/55200 loss 1.1311 tok/s 49,112 lr 3.03e-05 mem 9.7GB
+[train] step 54200/55200 loss 1.0524 tok/s 49,580 lr 3.02e-05 mem 9.7GB
+[train] step 54300/55200 loss 1.1691 tok/s 49,997 lr 3.02e-05 mem 9.7GB
+[train] step 54400/55200 loss 1.2241 tok/s 50,361 lr 3.01e-05 mem 9.7GB
+[train] step 54500/55200 loss 1.1985 tok/s 50,665 lr 3.01e-05 mem 9.7GB
+[train] step 54600/55200 loss 1.1845 tok/s 50,943 lr 3.01e-05 mem 9.7GB
+[eval] step 54600 val_loss 1.2516
+[train] step 54700/55200 loss 1.0977 tok/s 49,985 lr 3.01e-05 mem 9.7GB
+[train] step 54800/55200 loss 1.0837 tok/s 49,580 lr 3.00e-05 mem 9.7GB
+[train] step 54900/55200 loss 0.9728 tok/s 49,162 lr 3.00e-05 mem 9.7GB
+[train] step 55000/55200 loss 1.0825 tok/s 44,866 lr 3.00e-05 mem 9.7GB
+[train] step 55100/55200 loss 1.0176 tok/s 40,886 lr 3.00e-05 mem 9.7GB
+[train] step 55200/55200 loss 1.2388 tok/s 37,428 lr 3.00e-05 mem 9.7GB
+[eval] step 55200 val_loss 1.2535
+[done] step 55200, 1149s, final ckpt saved

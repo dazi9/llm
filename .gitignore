@@ -1,0 +1,21 @@
+# third-party clones (reference material, each has its own git history)
+ref/
+
+# large artifacts (kept in WSL ~/llm-lab/runs, too big for git)
+*.pt
+*.bin
+runs-main/model_final.pt
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# data downloads
+*.txt.part
+data/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,26 @@
+[config] {"vocab_size": 10000, "d_model": 768, "n_layers": 12, "n_heads": 12, "ctx": 512, "d_ff": 2048, "attn": "sdpa", "tie_embeddings": false, "residual_init_scale": false, "preset": "main", "n_params": 100313856}
+[data] train tokens: 467,404,398 | valid tokens: 4,702,679
+[resume] from step 52500
+W1028 08:11:35.888000 449 torch/_inductor/utils.py:1613] [0/0] Not enough SMs to use max_autotune_gemm mode
+[train] step 52600/58500 loss 1.1938 tok/s 25,567 lr 3.68e-05 mem 9.7GB
+[train] step 52700/58500 loss 1.1083 tok/s 27,499 lr 3.66e-05 mem 9.7GB
+[train] step 52800/58500 loss 1.2266 tok/s 29,292 lr 3.64e-05 mem 9.7GB
+[train] step 52900/58500 loss 1.2779 tok/s 30,821 lr 3.62e-05 mem 9.7GB
+[train] step 53000/58500 loss 1.2528 tok/s 32,330 lr 3.59e-05 mem 9.7GB
+[train] step 53100/58500 loss 1.2399 tok/s 33,665 lr 3.57e-05 mem 9.7GB
+[train] step 53200/58500 loss 1.1508 tok/s 34,876 lr 3.55e-05 mem 9.7GB
+[train] step 53300/58500 loss 1.1369 tok/s 35,950 lr 3.53e-05 mem 9.7GB
+[train] step 53400/58500 loss 1.0265 tok/s 36,874 lr 3.51e-05 mem 9.7GB
+[train] step 53500/58500 loss 1.1364 tok/s 37,716 lr 3.49e-05 mem 9.7GB
+[train] step 53600/58500 loss 1.0716 tok/s 38,555 lr 3.47e-05 mem 9.7GB
+[train] step 53700/58500 loss 1.2920 tok/s 39,223 lr 3.45e-05 mem 9.7GB
+[train] step 53800/58500 loss 1.0573 tok/s 39,851 lr 3.44e-05 mem 9.7GB
+[train] step 53900/58500 loss 1.1092 tok/s 40,428 lr 3.42e-05 mem 9.7GB
+[train] step 54000/58500 loss 1.1413 tok/s 40,983 lr 3.40e-05 mem 9.7GB
+[eval] step 54000 val_loss 1.2453
+[train] step 54100/58500 loss 1.1190 tok/s 39,823 lr 3.38e-05 mem 9.7GB
+[train] step 54200/58500 loss 1.1472 tok/s 39,385 lr 3.36e-05 mem 9.7GB
+[train] step 54300/58500 loss 1.0265 tok/s 38,913 lr 3.35e-05 mem 9.7GB
+[train] step 54400/58500 loss 1.0812 tok/s 38,601 lr 3.33e-05 mem 9.7GB
+[train] step 54500/58500 loss 1.1263 tok/s 38,335 lr 3.32e-05 mem 9.7GB
+[train] step 54600/58500 loss 1.1945 tok/s 36,188 lr 3.30e-05 mem 9.7GB
