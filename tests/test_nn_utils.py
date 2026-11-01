@@ -13,6 +13,19 @@ def test_cross_entropy_matches_torch():
     assert torch.allclose(ours, ref, atol=1e-5)
 
 
+def test_cross_entropy_ignore_index():
+    torch.manual_seed(0)
+    logits = torch.randn(32, 50) * 3
+    targets = torch.randint(0, 50, (32,))
+    targets[:10] = -100  # masked positions
+    ours = cross_entropy(logits, targets, ignore_index=-100)
+    ref = F.cross_entropy(logits, targets, ignore_index=-100)
+    assert torch.allclose(ours, ref, atol=1e-5)
+    # all-masked edge case returns 0 without touching the gather
+    all_masked = torch.full((8,), -100)
+    assert cross_entropy(logits[:8], all_masked, ignore_index=-100).item() == 0.0
+
+
 def test_adamw_matches_torch():
     torch.manual_seed(0)
     p1 = torch.nn.Parameter(torch.randn(30, 20))

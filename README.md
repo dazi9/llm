@@ -1,110 +1,89 @@
-# llm-lab — 从零构建并优化一个小型大语言模型(CS336 风格)
+# llm-lab — 从零构建并优化小型语言模型(CS336 风格)
 
-> One-night, from-scratch LLM build on a single RTX 5070 Ti Laptop (12GB), following
-> the spirit of Stanford CS336 (Language Modeling from Scratch): hand-written BPE,
-> hand-written Transformer, hand-written AdamW, hand-written Triton FlashAttention,
-> measured optimizations. Everything runs inside WSL2 Ubuntu.
+> 单卡 RTX 5070 Ti Laptop(12GB)+ WSL2 Ubuntu,全部组件手写:
+> BPE / Transformer(RMSNorm+RoPE+SwiGLU+QK-Norm)/ AdamW / Triton FlashAttention / 消融 harness。
+> 两条数据线:TinyStories(儿童故事,已完成)和 Fineweb-Edu(真实网页,最终模型)。
+
+## 现在就能玩(不用等训练完)
+
+进入环境(每次开终端先执行):
+```bash
+wsl.exe -d Ubuntu -e bash -lc "bash /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab/scripts/env_setup.sh"   # 仅首次
+source ~/llm-lab/.venv/bin/activate
+cd /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab
+```
+
+**① 文本续写生成**(给开头,模型接 300 token):
+```bash
+# v1:故事模型(TinyStories)——写童话
+python src/sample.py --ckpt ~/llm-lab/runs/main/model_final.pt --prompt "Once upon a time" --max-new 300 --n 3
+# v2:网页语料模型(明早完成后可用)——写百科式文本
+python src/sample.py --ckpt ~/llm-lab/runs/v2/model_final.pt --prompt "The history of artificial intelligence" --max-new 300 --n 3
+# 参数:--temperature 0.8(越高越随机) --top-p 0.95 --seed 42(固定可复现)
+```
+
+**② 交互式续写 REPL**(打一句开头,回车,模型接着写;`exit` 退出):
+```bash
+python src/chat.py --ckpt ~/llm-lab/runs/v2/model_final.pt
+```
+
+**③ 微调后再玩**(SFT 让模型学会"给开头写完整段落并停止"):
+```bash
+python src/sft.py --init ~/llm-lab/runs/v2/model_final.pt --pairs ~/llm-lab/data/sft_pairs.jsonl --steps 300 --out ~/llm-lab/runs/sft_v2
+python src/chat.py --ckpt ~/llm-lab/runs/sft_v2/model_final.pt
+```
+
+**⚠️ 期望管理(重要)**:这是 134M 参数的研究模型,不是 ChatGPT——
+- 它做**续写**很好(给开头接得有模有样),但**不是指令聊天机器人**:你问问题它多半会"接着你的话写"而不是回答
+- v2 只见过英文网页,中文输出会很差;英文流利但会一本正经地编造事实(所有 1 亿级模型的通病)
+- 想要真·对话:把 SFT 数据换成指令数据集(如 Alpaca 子集,走 hf-mirror 可下)再跑一遍 `sft.py` 即可,管线已就绪
 
 ## 项目结构
 
 ```
 llm-lab/
 ├── src/
-│   ├── tokenizer.py        # 字节级 BPE:GPT-2 预分词正则 + 增量 pair count + 惰性堆训练;按 rank 合并的编码
-│   ├── model.py            # RMSNorm / RoPE / SwiGLU / causal MHA(sdpa|naive 双后端),三个尺寸预设
-│   ├── nn_utils.py         # 手写 AdamW(bias correction + 解耦 weight decay)、cosine 调度、梯度裁剪、交叉熵
-│   ├── data.py             # uint16 token bin 的 memmap 随机批采样
-│   ├── flash_attention.py  # Triton 手写 causal FlashAttention 前向(online softmax)+ naive 参考实现
-│   ├── train.py            # 训练主循环:bf16 autocast / torch.compile / 断点续训 / CSV 日志
-│   ├── benchmark.py        # 吞吐 benchmark:{fp32,bf16}×{naive,sdpa}×{eager,compile} + attention 微基准
-│   ├── prepare_data.py     # BPE 训练 + 全语料多进程预分词 → memmap bin
-│   ├── sample.py           # 加载 checkpoint,temperature/top-p 采样
-│   ├── sft.py              # (prompt, completion) 对的 SFT,prompt 位置 mask 掉 loss
-│   └── chat.py             # 故事续写 REPL
-├── tests/                  # pytest:AdamW 对拍 torch、RoPE 参考实现、因果性、Triton 正确性、tokenizer 回环
-├── scripts/                # env_setup.sh / download_data.sh(WSL 内执行)
-├── kb/                     # 精读笔记(CS336 / llm.c / nanoGPT)
-├── reports/                # benchmark 与实验报告
-└── runs/                   # (WSL ~/llm-lab/runs) checkpoint 与训练日志
+│   ├── tokenizer.py        # BPE:GPT-2 正则 + 增量计数 + 惰性堆(262MB→10K 词表 20s)
+│   ├── model.py            # RMSNorm/RoPE/SwiGLU/QK-Norm/GQA/NoPE 全部可开关
+│   ├── nn_utils.py         # 手写 AdamW(与 torch 逐位对拍)/ cosine / 裁剪 / CE(-100 掩码)
+│   ├── flash_attention.py  # Triton 手写 FlashAttention 前向(57 TFLOPS ≈ cuDNN 107%)
+│   ├── train.py            # 训练循环:bf16/compile/断点续训/CSV 日志/消融开关
+│   ├── run_ablation.py     # 受控架构消融驱动(参数自动对齐)
+│   ├── aggregate_ablation.py
+│   ├── benchmark.py / benchmark_adamw.py
+│   ├── prepare_data.py     # TinyStories 管线;prepare_fineweb.py:流式 parquet 管线
+│   ├── sample.py / chat.py / sft.py / build_sft_pairs.py
+├── tests/                  # 23 个测试(AdamW 逐位对拍、kernel 正确性、续训回环…)
+├── kb/                     # 精读笔记:CS336 A1/A2、nanoGPT、llm.c(+7 节追加)
+├── reports/                # benchmark.md / ablation.md / experiment-report.md / 样本
+├── runs-main/              # v1 训练日志归档(模型权重在 WSL ~/llm-lab/runs/)
+└── scripts/                # env_setup / download_data / status / finalize
 ```
 
-## 模型尺寸
+## 模型一览
 
-| preset | d_model | layers | heads | d_ff(SwiGLU) | 参数量(vocab 10K, untied) |
+| 模型 | 参数 | 数据 | token 量 | val loss | 位置(WSL) |
 |---|---|---|---|---|---|
-| tiny   | 256 | 4  | 4  | 704  | ~8.3M  |
-| small  | 512 | 6  | 8  | 1408 | ~29.6M |
-| main   | 768 | 12 | 12 | 2048 | ~100M  |
+| v1 main | 100.3M | TinyStories | 9.05 亿 (1.94ep) | **1.2535** | runs/main/model_final.pt |
+| 消融最优 small | 28.9M | TinyStories | 0.82 亿 | **1.5974** (qk_norm) | runs/ablation/qk_norm_lr1e-03/ |
+| **v2 main** | **134.1M** | **Fineweb-Edu 网页** | **17.2 亿** | 训练中 | runs/v2/(ETA 次日 ~06:20)|
 
-统一 seq_len=512、RoPE θ=10000、RMSNorm ε=1e-5。数据:TinyStories(~2B tokens)。
-
-## 快速开始(全部在 WSL 内)
-
-```bash
-# 0) 一次性环境(已由 agent 完成的话跳过)
-bash /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab/scripts/env_setup.sh
-
-# 1) 数据准备(BPE 训练 + 全语料预分词,一次性,~10 分钟)
-source ~/llm-lab/.venv/bin/activate
-cd /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab
-python src/prepare_data.py --data-dir ~/llm-lab/data
-
-# 2) 冒烟(tiny,几分钟)
-python src/train.py --preset tiny --max-steps 300 --out ~/llm-lab/runs/smoke
-
-# 3) 正式训练(small ~1h;main 整夜)
-python src/train.py --preset small --out ~/llm-lab/runs/small
-python src/train.py --preset main --batch-size 32 --out ~/llm-lab/runs/main
-
-# 4) 采样
-python src/sample.py --ckpt ~/llm-lab/runs/main/model_final.pt --prompt "Once upon a time"
-
-# 5) 基准(输出 reports/benchmark.md)
-python src/benchmark.py --preset small
-
-# 6) 跑测试
-python -m pytest tests -q
-```
-
-## 监控训练(随时看)
+## 监控 / 收尾
 
 ```powershell
-# Windows 侧一键状态(PowerShell / Git Bash 都行):
-wsl.exe -d Ubuntu -e bash /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab/scripts/status.sh
-```
-
-或直接在 WSL 里:`tail -f ~/llm-lab/runs/main/train.log`、`nvidia-smi`。
-主力训练是 `setsid nohup` 脱离会话运行的,关掉终端不影响;**别关机/别睡眠**即可,
-预计 ~07:25 完成 68000 步(≈11 亿 token ≈ 2.4 epoch),日志在 `runs/main/log.csv`。
-
-## 实验结果(已回填部分)
-
-- 优化链路:fp32+naive 42,881 tok/s → **bf16+sdpa+compile 155,656 tok/s(3.63×)**,详见 `reports/benchmark.md`
-- 手写 Triton FlashAttention forward:**57.1 TFLOPS**,≈ cuDNN flash 的 107%,naive 的 24×
-- small(28.9M)11 分钟训完,val loss **1.6414**,能生成完整有对话的故事(见 reports/)
-- main(100.3M)整夜训练中;完整报告:`reports/experiment-report.md`
-- 精读笔记:`kb/cs336/a1-basics.md`、`kb/cs336/a2-systems.md`、`kb/nanogpt/notes.md`、`kb/llmc/notes.md`
-
-## 明早训练完成后可跑(可选)
-
-**一键收尾**(采样 main → SFT 800 步 → 采样 SFT → 归档到工作区,约 5 分钟):
-```powershell
+# 训练状态(Windows 任意终端)
+wsl.exe -d Ubuntu -e bash -lc "tail -3 ~/llm-lab/runs/v2/train.log"
+# 一键收尾(采样+SFT+归档,训练完成后)
 wsl.exe -d Ubuntu -e bash -lc "bash /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab/scripts/finalize.sh"
 ```
 
-或分步(全部在 WSL 内):
-```bash
-source ~/llm-lab/.venv/bin/activate
-cd /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab
-python src/sample.py --ckpt ~/llm-lab/runs/main/model_final.pt --prompt "Once upon a time" --n 3
-python src/chat.py --ckpt ~/llm-lab/runs/main/model_final.pt    # 交互式故事续写
-# SFT(让模型学会"给开头写完整故事",~3 分钟):
-python src/sft.py --init ~/llm-lab/runs/main/model_final.pt --pairs ~/llm-lab/data/sft_pairs.jsonl --steps 800
-python src/chat.py --ckpt ~/llm-lab/runs/sft/model_final.pt
-```
+## 实验结果
+
+- `reports/benchmark.md`:优化链 fp32+naive 42.9K → bf16+sdpa+compile **155.7K tok/s(3.63×)**;Triton FA 57 TFLOPS;AdamW 步进占比
+- `reports/ablation.md`:QK-Norm 1.5974 / GQA 1.6206 / baseline 1.6294(排序跨学习率一致)
+- `reports/experiment-report.md`:完整报告(含事故复盘与改进清单)
+- `kb/`:CS336 A1/A2、nanoGPT、llm.c 精读笔记(中文)
 
 ## 网络环境说明(本机)
 
-- huggingface.co 不可达 → 数据走 hf-mirror.com
-- pypi.nvidia.com 不可达 → torch 走 pypi.tuna.tsinghua.edu.cn(实测 ~7.4MB/s)
-- github.com 可用但慢
+- huggingface.co 不可达 → hf-mirror.com;pypi.nvidia.com 不可达 → 清华源;github 可用但慢

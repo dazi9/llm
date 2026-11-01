@@ -9,9 +9,22 @@ from typing import Iterable
 import torch
 
 
-def cross_entropy(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-    """Mean CE over flattened (N, V) logits and (N,) int targets."""
+def cross_entropy(logits: torch.Tensor, targets: torch.Tensor,
+                  ignore_index: int | None = None) -> torch.Tensor:
+    """Mean CE over flattened (N, V) logits and (N,) int targets.
+
+    With ignore_index (e.g. -100 for SFT prompt masking), masked positions are
+    excluded BEFORE the gather — a raw gather at -100 would trigger a CUDA
+    index assert and poison the context (manifesting downstream as bogus
+    CUBLAS errors in backward).
+    """
     logits = logits.float()
+    if ignore_index is not None:
+        mask = targets != ignore_index
+        if not mask.any():
+            return logits.sum() * 0.0
+        logits = logits[mask]
+        targets = targets[mask]
     m = logits.max(dim=-1, keepdim=True).values
     lse = (logits - m).exp().sum(dim=-1, keepdim=True).log() + m
     picked = logits.gather(-1, targets.unsqueeze(-1)).squeeze(-1)

@@ -65,7 +65,10 @@ def main():
 
     model = TransformerLM(vocab_size=config["vocab_size"], d_model=config["d_model"],
                           n_layers=config["n_layers"], n_heads=config["n_heads"],
-                          ctx=config["ctx"], d_ff=config.get("d_ff"), attn="sdpa")
+                          ctx=config["ctx"], d_ff=config.get("d_ff"), attn="sdpa",
+                          qk_norm=config.get("qk_norm", False),
+                          n_kv_heads=config.get("n_kv_heads"),
+                          use_rope=config.get("use_rope", True))
     model.load_state_dict(ckpt["model"])
     model.to(device).eval()
 

@@ -88,24 +88,38 @@ class RotaryPositionalEmbedding(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, attn: str = "sdpa"):
+    def __init__(self, d_model: int, n_heads: int, attn: str = "sdpa",
+                 qk_norm: bool = False, n_kv_heads: int | None = None):
         super().__init__()
         assert d_model % n_heads == 0
         self.n_heads = n_heads
         self.d_head = d_model // n_heads
+        self.n_kv_heads = n_kv_heads or n_heads
+        assert n_heads % self.n_kv_heads == 0, "n_heads must be divisible by n_kv_heads (GQA)"
         self.attn = attn
         self.q = Linear(d_model, d_model)
-        self.k = Linear(d_model, d_model)
-        self.v = Linear(d_model, d_model)
+        self.k = Linear(d_model, self.n_kv_heads * self.d_head)
+        self.v = Linear(d_model, self.n_kv_heads * self.d_head)
         self.o = Linear(d_model, d_model)
+        # QK-Norm: per-head RMSNorm on q,k before RoPE (adds 2*d_head params/layer)
+        self.q_norm = RMSNorm(self.d_head) if qk_norm else None
+        self.k_norm = RMSNorm(self.d_head) if qk_norm else None
 
-    def forward(self, x: torch.Tensor, rope: RotaryPositionalEmbedding) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, rope: RotaryPositionalEmbedding | None) -> torch.Tensor:
         B, S, _ = x.shape
         q = self.q(x).view(B, S, self.n_heads, self.d_head).transpose(1, 2)
-        k = self.k(x).view(B, S, self.n_heads, self.d_head).transpose(1, 2)
-        v = self.v(x).view(B, S, self.n_heads, self.d_head).transpose(1, 2)
-        q = rope(q)
-        k = rope(k)
+        k = self.k(x).view(B, S, self.n_kv_heads, self.d_head).transpose(1, 2)
+        v = self.v(x).view(B, S, self.n_kv_heads, self.d_head).transpose(1, 2)
+        if self.q_norm is not None:
+            q = self.q_norm(q)
+            k = self.k_norm(k)
+        if rope is not None:
+            q = rope(q)
+            k = rope(k)
+        if self.n_kv_heads != self.n_heads:  # GQA: repeat KV groups
+            rep = self.n_heads // self.n_kv_heads
+            k = k.repeat_interleave(rep, dim=1)
+            v = v.repeat_interleave(rep, dim=1)
         if self.attn == "sdpa":
             out = F.scaled_dot_product_attention(q, k, v, is_causal=True)
         elif self.attn == "naive":
@@ -131,14 +145,15 @@ class SwiGLU(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, d_ff: int, attn: str):
+    def __init__(self, d_model: int, n_heads: int, d_ff: int, attn: str,
+                 qk_norm: bool = False, n_kv_heads: int | None = None):
         super().__init__()
         self.norm1 = RMSNorm(d_model)
-        self.attn = Attention(d_model, n_heads, attn)
+        self.attn = Attention(d_model, n_heads, attn, qk_norm=qk_norm, n_kv_heads=n_kv_heads)
         self.norm2 = RMSNorm(d_model)
         self.mlp = SwiGLU(d_model, d_ff)
 
-    def forward(self, x: torch.Tensor, rope: RotaryPositionalEmbedding) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, rope: RotaryPositionalEmbedding | None) -> torch.Tensor:
         x = x + self.attn(self.norm1(x), rope)
         x = x + self.mlp(self.norm2(x))
         return x
@@ -147,17 +162,22 @@ class Block(nn.Module):
 class TransformerLM(nn.Module):
     def __init__(self, vocab_size: int, d_model: int, n_layers: int, n_heads: int,
                  ctx: int = 512, d_ff: int | None = None, attn: str = "sdpa",
-                 tie_embeddings: bool = False, residual_init_scale: bool = False):
+                 tie_embeddings: bool = False, residual_init_scale: bool = False,
+                 qk_norm: bool = False, n_kv_heads: int | None = None,
+                 use_rope: bool = True):
         super().__init__()
         d_ff = d_ff or _dff(d_model)
         self.ctx = ctx
         self.config = dict(vocab_size=vocab_size, d_model=d_model, n_layers=n_layers,
                            n_heads=n_heads, ctx=ctx, d_ff=d_ff, attn=attn,
                            tie_embeddings=tie_embeddings,
-                           residual_init_scale=residual_init_scale)
+                           residual_init_scale=residual_init_scale,
+                           qk_norm=qk_norm, n_kv_heads=n_kv_heads, use_rope=use_rope)
         self.tok_emb = Embedding(vocab_size, d_model)
-        self.rope = RotaryPositionalEmbedding(max_seq=max(ctx * 2, 4096))
-        self.blocks = nn.ModuleList([Block(d_model, n_heads, d_ff, attn) for _ in range(n_layers)])
+        self.rope = RotaryPositionalEmbedding(max_seq=max(ctx * 2, 4096)) if use_rope else None
+        self.blocks = nn.ModuleList([
+            Block(d_model, n_heads, d_ff, attn, qk_norm=qk_norm, n_kv_heads=n_kv_heads)
+            for _ in range(n_layers)])
         self.norm_f = RMSNorm(d_model)
         self.lm_head = Linear(d_model, vocab_size)
         if tie_embeddings:
@@ -186,6 +206,7 @@ class TransformerLM(nn.Module):
         return n
 
 
-def build_model(preset: str, vocab_size: int, attn: str = "sdpa") -> TransformerLM:
-    cfg = PRESETS[preset]
+def build_model(preset: str, vocab_size: int, attn: str = "sdpa", **overrides) -> TransformerLM:
+    cfg = dict(PRESETS[preset])
+    cfg.update(overrides)
     return TransformerLM(vocab_size=vocab_size, attn=attn, **cfg)

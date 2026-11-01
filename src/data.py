@@ -6,8 +6,13 @@ import torch
 
 
 class TokenBin:
-    def __init__(self, path: str):
-        self.data = np.memmap(path, dtype=np.uint16, mode="r")
+    def __init__(self, path: str, preload: bool = True):
+        if preload:
+            # 5.8GB web bin does NOT fit in page cache -> memmap random reads
+            # thrash the disk; load into RAM once (get_batch is random access).
+            self.data = np.fromfile(path, dtype=np.uint16)
+        else:
+            self.data = np.memmap(path, dtype=np.uint16, mode="r")
         self.n = len(self.data)
 
     def __len__(self) -> int:

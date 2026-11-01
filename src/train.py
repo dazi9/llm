@@ -40,6 +40,10 @@ def get_args():
     p.add_argument("--clip", type=float, default=1.0)
     p.add_argument("--precision", default="bf16", choices=["fp32", "bf16"])
     p.add_argument("--attn", default="sdpa", choices=["sdpa", "naive"])
+    p.add_argument("--d-ff", type=int, default=None, help="override preset d_ff (param alignment)")
+    p.add_argument("--qk-norm", action="store_true")
+    p.add_argument("--n-kv-heads", type=int, default=None)
+    p.add_argument("--no-rope", action="store_true")
     p.add_argument("--optimizer", default="ours", choices=["ours", "fused"],
                    help="ours=hand-written AdamW (per-tensor loop); fused=torch fused AdamW. "
                         "Resume must use the same type (state dict formats differ).")
@@ -51,6 +55,9 @@ def get_args():
     p.add_argument("--resume", action="store_true")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--vocab-size", type=int, default=10000)
+    p.add_argument("--train-bin", default=None, help="override tokens_train.bin path")
+    p.add_argument("--valid-bin", default=None, help="override tokens_valid.bin path")
+    p.add_argument("--tokenizer", default=None, help="tokenizer.json path stored in ckpt")
     return p.parse_args()
 
 
@@ -66,7 +73,9 @@ def main():
     out_dir = args.out or os.path.expanduser(f"~/llm-lab/runs/{args.preset}")
     os.makedirs(out_dir, exist_ok=True)
 
-    model = build_model(args.preset, args.vocab_size, attn=args.attn).to(device)
+    model = build_model(args.preset, args.vocab_size, attn=args.attn, d_ff=args.d_ff,
+                        qk_norm=args.qk_norm, n_kv_heads=args.n_kv_heads,
+                        use_rope=not args.no_rope).to(device)
     n_params = model.num_params()
     print(f"[config] {json.dumps({**model.config, 'preset': args.preset, 'n_params': n_params})}", flush=True)
 
@@ -77,8 +86,8 @@ def main():
     else:
         opt = AdamW(model.parameters(), lr=lr0, betas=(args.beta1, args.beta2),
                     weight_decay=args.wd)
-    train_bin = TokenBin(os.path.join(args.data_dir, "tokens_train.bin"))
-    val_bin = TokenBin(os.path.join(args.data_dir, "tokens_valid.bin"))
+    train_bin = TokenBin(args.train_bin or os.path.join(args.data_dir, "tokens_train.bin"))
+    val_bin = TokenBin(args.valid_bin or os.path.join(args.data_dir, "tokens_valid.bin"))
     print(f"[data] train tokens: {len(train_bin):,} | valid tokens: {len(val_bin):,}", flush=True)
 
     gen = torch.Generator().manual_seed(args.seed)
@@ -184,7 +193,7 @@ def main():
             os.replace(ckpt_path + ".tmp", ckpt_path)
 
     torch.save({"model": model.state_dict(), "config": model.config,
-                "tokenizer": os.path.join(args.data_dir, "tokenizer.json")},
+                "tokenizer": args.tokenizer or os.path.join(args.data_dir, "tokenizer.json")},
                os.path.join(out_dir, "model_final.pt"))
     print(f"[done] step {step}, {time.time()-t0:.0f}s, final ckpt saved", flush=True)
     csv_f.close()

@@ -126,17 +126,25 @@ class Tokenizer:
         cached = self._word_cache.get(wb)
         if cached is not None:
             return cached
-        ids = list(wb)
-        while len(ids) > 1:
-            best_rank: int | None = None
-            best_pair: tuple[int, int] | None = None
-            for pair in zip(ids, ids[1:]):
-                r = self._ranks.get(pair)
-                if r is not None and (best_rank is None or r < best_rank):
-                    best_rank, best_pair = r, pair
-            if best_pair is None:
-                break
-            ids = _merge_ids(ids, best_pair, 256 + best_rank)
+        if len(wb) > 5000:
+            # web text contains multi-MB "words" (base64 blobs, minified JS);
+            # the O(n^2)-ish merge loop explodes on them -> raw byte fallback
+            ids = list(wb)
+        else:
+            ids = list(wb)
+            while len(ids) > 1:
+                best_rank: int | None = None
+                best_pair: tuple[int, int] | None = None
+                for pair in zip(ids, ids[1:]):
+                    r = self._ranks.get(pair)
+                    if r is not None and (best_rank is None or r < best_rank):
+                        best_rank, best_pair = r, pair
+                if best_pair is None:
+                    break
+                ids = _merge_ids(ids, best_pair, 256 + best_rank)
+        if len(self._word_cache) > 1_000_000:
+            # web text has millions of unique words; unbounded caches OOM
+            self._word_cache.clear()
         self._word_cache[wb] = ids
         return ids
 
