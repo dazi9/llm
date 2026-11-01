@@ -6,11 +6,13 @@
 
 ## 现在就能玩(不用等训练完)
 
-进入环境(每次开终端先执行):
+进入环境(每次开终端先执行;`~/llm-lab/code` 是指向本仓库的 WSL 符号链接,由第 0 步建立):
 ```bash
-wsl.exe -d Ubuntu -e bash -lc "bash /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab/scripts/env_setup.sh"   # 仅首次
+# 0) 一次性环境安装(仅首次;在 WSL 内进入本仓库目录后运行):
+bash scripts/env_setup.sh
+# 之后所有命令只用 WSL 原生路径:
 source ~/llm-lab/.venv/bin/activate
-cd /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab
+cd ~/llm-lab/code
 ```
 
 **① 文本续写生成**(给开头,模型接 300 token):
@@ -74,7 +76,7 @@ llm-lab/
 # 训练状态(Windows 任意终端)
 wsl.exe -d Ubuntu -e bash -lc "tail -3 ~/llm-lab/runs/v2/train.log"
 # 一键收尾(采样+SFT+归档,训练完成后)
-wsl.exe -d Ubuntu -e bash -lc "bash /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab/scripts/finalize.sh"
+wsl.exe -d Ubuntu -e bash -lc "bash ~/llm-lab/scripts/finalize.sh"
 ```
 
 ## 实验结果

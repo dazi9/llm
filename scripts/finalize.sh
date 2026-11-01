@@ -5,7 +5,8 @@
 #   wsl.exe -d Ubuntu -e bash -lc "bash /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab/scripts/finalize.sh"
 set -e
 source ~/llm-lab/.venv/bin/activate
-cd /mnt/c/Users/dazi9/.zcode/workspace/default/llm-lab
+REPO="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+cd "$REPO"
 
 echo "=== 1) sample main (final) ==="
 python src/sample.py --ckpt ~/llm-lab/runs/main/model_final.pt \

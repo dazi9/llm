@@ -11,6 +11,14 @@ export PATH="$HOME/.local/bin:$PATH"
 uv --version || { echo "UV_FAILED"; exit 1; }
 
 mkdir -p ~/llm-lab/data ~/llm-lab/runs ~/llm-lab/cache
+
+# Self-locate the repo (works regardless of where this script is mounted from)
+# and expose it at a stable WSL-native path so no /mnt/c/... hardcodes exist.
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SELF_DIR")"
+ln -sfn "$REPO_DIR" ~/llm-lab/code
+echo "repo symlink: ~/llm-lab/code -> $REPO_DIR"
+
 cd ~/llm-lab
 
 if [ ! -x .venv/bin/python ]; then
