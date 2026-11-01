@@ -68,7 +68,10 @@ llm-lab/
 |---|---|---|---|---|---|
 | v1 main | 100.3M | TinyStories | 9.05 亿 (1.94ep) | **1.2535** | runs/main/model_final.pt |
 | 消融最优 small | 28.9M | TinyStories | 0.82 亿 | **1.5974** (qk_norm) | runs/ablation/qk_norm_lr1e-03/ |
-| **v2 main** | **134.1M** | **Fineweb-Edu 网页** | **17.2 亿** | 训练中 | runs/v2/(ETA 次日 ~06:20)|
+| **v2 main** | **134.1M** | **Fineweb-Edu 网页** | **9.83 亿 (0.34ep)** | **2.6755** ✅ | runs/v2/model_final.pt |
+
+**v2 已完成**(120000 步 / 7.9 小时):真实网页语料上的 GPT-2 级 baseline,HF LLaMA 格式
+已导出(`~/llm-lab/export/`),轻薄本部署指南见 `reports/thin-laptop-guide.md`。
 
 ## 监控 / 收尾
 

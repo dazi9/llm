@@ -74,6 +74,11 @@ B=8, H=12, S=512, D=64, bf16:
   (怪物吃掉了泰迪熊 Brownie)。质量全面优于 small 终版:无重复退化、词汇丰富、
   叙事有因果结构。
 - small(28.9M):val **1.6414**(98.3M tokens,0.21 epoch)
+- **v2(134.1M,32K 词表,QK-Norm)最终**:120000 步 × 8192 token = **9.83 亿 token(0.34 epoch,Fineweb-Edu)**,7.9 小时,33.2K tok/s 均值
+  - val 曲线:10.50 → 3.13(15K)→ 2.94(35K)→ 2.86(50K)→ 2.78(70K)→ 2.68(90K)→ **2.6755(120K,最终)**
+  - 参照:GPT-2 124M 在 OpenWebText 上 10B token → ~3.1;我们以 1/14 token 量在更精语料上到 2.68
+  - 采样质量(节选,prompt "The history of artificial intelligence"):自发生成段落结构与小标题("Computer Science and Artificial Intelligence"),主题一致、句法流畅,尾部有重复——134M 的典型形态
+- **模型导出**:v1 已导出 HF LLaMA 格式(export/v1/),GGUF 转换与轻薄本部署见 reports/thin-laptop-guide.md;v2 因 QK-Norm 需架构映射,见同文说明
 
 ## 5. 与参照系的对照
 
