@@ -15,7 +15,7 @@
 | ch06 | 让它变快:bf16、FlashAttention 与编译 | src/flash_attention.py, benchmark | ✅ |
 | ch07 | 数据决定行为:两个语料,两个模型 | src/prepare_data.py, prepare_fineweb.py | ✅ |
 | ch08 | 消融方法学:QK-Norm 实验复盘 | src/run_ablation.py | ✅ |
-| ch09 | 部署:把模型装进 59MB | src/export_hf.py, thin-laptop-guide | ☐ |
+| ch09 | 部署:把模型装进 59MB | src/export_hf.py, thin-laptop-guide | ✅ |
 | ch10 | 十个练习与下一步 | 全仓库 | ☐ |
 
 ## 写作规范(给每个写章节的 agent)
