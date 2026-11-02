@@ -4,6 +4,15 @@
 > BPE / Transformer(RMSNorm+RoPE+SwiGLU+QK-Norm)/ AdamW / Triton FlashAttention / 消融 harness。
 > 两条数据线:TinyStories(儿童故事,已完成)和 Fineweb-Edu(真实网页,最终模型)。
 
+## 克隆之后的三条路径
+
+**注意**:本仓库只含代码和文档,**不含模型权重和数据**(git 不放 500MB 级文件)。
+`git clone` 后按你想要的东西选路径:
+
+- **路径 A:从零重训**(体验完整流程,最推荐)——按下面的"一次性环境"→"数据准备"→"训练"顺序走,small 模型 ~1 小时、main 模型一晚,产出你自己的权重
+- **路径 B:拷权重即玩**(最快)——从本机 `~/llm-lab/runs/` 拷 `model_final.pt`(536MB)+ `data/tokenizer*.json`,或直接用现成量化包 `C:\Users\dazi9\llm-deploy\thin-laptop-kit\`(59MB GGUF + llama-cli,免 Python),也可以在本仓库 Releases 页挂附件后用 `git clone --depth 1` + Release 下载
+- **路径 C:只读文档学习**——`reports/` 和 `kb/` 独立成立,不需要跑任何代码
+
 ## 现在就能玩(不用等训练完)
 
 进入环境(每次开终端先执行;`~/llm-lab/code` 是指向本仓库的 WSL 符号链接,由第 0 步建立):
