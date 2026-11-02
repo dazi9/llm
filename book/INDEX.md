@@ -9,7 +9,7 @@
 |---|---|---|---|
 | ch01 | 从字符预测说起:语言模型到底是什么 | 无(直觉章) | ✅ |
 | ch02 | 分词器:文本如何变成数字 | src/tokenizer.py | ✅ |
-| ch03 | 注意力:一个会"查字典"的函数 | src/model.py (Attention) | ☐ |
+| ch03 | 注意力:一个会"查字典"的函数 | src/model.py (Attention) | ✅ |
 | ch04 | Transformer 块:RMSNorm、RoPE 与 SwiGLU | src/model.py (Block) | ☐ |
 | ch05 | 训练循环:loss、AdamW 与学习率调度 | src/nn_utils.py, src/train.py | ☐ |
 | ch06 | 让它变快:bf16、FlashAttention 与编译 | src/flash_attention.py, benchmark | ☐ |
