@@ -40,17 +40,37 @@ def main():
     model.load_state_dict(ckpt["model"])
     model.eval()
 
+    # Rename our tensor names to HF LLaMA conventions so llama.cpp's
+    # convert_hf_to_gguf.py maps them 1:1.
+    rename_map = {}
+    for i in range(config["n_layers"]):
+        rename_map[f"blocks.{i}.norm1.weight"] = f"model.layers.{i}.input_layernorm.weight"
+        rename_map[f"blocks.{i}.norm2.weight"] = f"model.layers.{i}.post_attention_layernorm.weight"
+        rename_map[f"blocks.{i}.attn.q.weight"] = f"model.layers.{i}.self_attn.q_proj.weight"
+        rename_map[f"blocks.{i}.attn.k.weight"] = f"model.layers.{i}.self_attn.k_proj.weight"
+        rename_map[f"blocks.{i}.attn.v.weight"] = f"model.layers.{i}.self_attn.v_proj.weight"
+        rename_map[f"blocks.{i}.attn.o.weight"] = f"model.layers.{i}.self_attn.o_proj.weight"
+        rename_map[f"blocks.{i}.mlp.w1.weight"] = f"model.layers.{i}.mlp.gate_proj.weight"
+        rename_map[f"blocks.{i}.mlp.w3.weight"] = f"model.layers.{i}.mlp.up_proj.weight"
+        rename_map[f"blocks.{i}.mlp.w2.weight"] = f"model.layers.{i}.mlp.down_proj.weight"
+        if config.get("qk_norm"):
+            rename_map[f"blocks.{i}.attn.q_norm.weight"] = f"model.layers.{i}.self_attn.q_norm.weight"
+            rename_map[f"blocks.{i}.attn.k_norm.weight"] = f"model.layers.{i}.self_attn.k_norm.weight"
+    rename_map["tok_emb.weight"] = "model.embed_tokens.weight"
+    rename_map["norm_f.weight"] = "model.norm.weight"
+    # lm_head.weight stays as-is
+
     os.makedirs(args.out, exist_ok=True)
+    sd = {rename_map.get(k, k): v.contiguous() for k, v in model.state_dict().items()}
     # Save safetensors via torch.save→safetensors shim (torch>=2.x supports it natively
     # through safetensors package if present; fall back to .bin which convert_hf_to_llama
     # also accepts).
     try:
         from safetensors.torch import save_file
-        sd = {k: v.contiguous() for k, v in model.state_dict().items()}
         save_file(sd, os.path.join(args.out, "model.safetensors"),
                   metadata={"format": "pt"})
     except ImportError:
-        torch.save(model.state_dict(), os.path.join(args.out, "pytorch_model.bin"))
+        torch.save(sd, os.path.join(args.out, "pytorch_model.bin"))
 
     # LLaMA-style config: our architecture is LLaMA-compatible when qk_norm is OFF
     # (RMSNorm + RoPE + SwiGLU + untied embeddings + no biases).
